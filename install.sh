@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # ---- config ---------------------------------------------------------------
-REPO="${SMALLCODE_REPO:-Zireael/smallcode}"
+REPO="${SMALLCODE_REPO:-Doorman11991/smallcode}"
 VERSION="${SMALLCODE_VER:-latest}"
 INSTALL_DIR="${SMALLCODE_HOME:-${HOME}/.smallcode}"
 

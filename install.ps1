@@ -15,7 +15,7 @@
 param(
   [string]$Version = "latest",
   [string]$InstallDir = "",
-  [string]$Repo = "Zireael/smallcode"
+  [string]$Repo = "Doorman11991/smallcode"
 )
 
 # ---- config ---------------------------------------------------------------

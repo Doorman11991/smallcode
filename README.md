@@ -24,7 +24,7 @@ SmallCode is a terminal-native coding agent designed from the ground up to extra
 ## Quick Start
 
 ```bash
-# Install globally
+# Install globally via npm
 npm install -g smallcode
 
 # Or run directly with npx
@@ -34,6 +34,17 @@ npx smallcode
 cd my-project
 smallcode
 ```
+
+### Prebuilt Binaries (no Node.js needed)
+
+Pre-compiled tarballs for Windows, macOS, and Linux are built on every release — they bundle Node.js plus all native addons so you never need `node-gyp` or C++ build tools.
+
+| Platform | One‑line install |
+|---|---|
+| Linux / macOS | `bash <(curl -fsSL https://raw.githubusercontent.com/Doorman11991/smallcode/main/install.sh)` |
+| Windows | `iwr -Uri https://raw.githubusercontent.com/Doorman11991/smallcode/main/install.ps1 -UseBasicParsing \| iex` |
+
+The install script downloads the correct tarball for your platform, extracts it to `~/.smallcode`, and adds it to your PATH. Run `smallcode --help` to verify.
 
 SmallCode includes [BoneScript](https://github.com/Doorman11991/BoneScript) and [budget-aware-mcp](https://github.com/Doorman11991/budget-aware-mcp) as dependencies — everything installs in one go.
 
