@@ -97,12 +97,18 @@ if ($existingCmd -and $existingCmd.Source -notlike "$InstallDir*") {
 
 # ---- add to PATH ----------------------------------------------------------
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+$pathUpdated = $false
 if ($userPath -notlike "*$InstallDir*") {
   $newPath = "$InstallDir;$userPath"
   [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
   Write-Host "==> Added $InstallDir to user PATH"
-  Write-Host "    Restart your terminal or run:"
-  Write-Host "    `$env:Path = `"`$env:Path;$InstallDir`""
+  $pathUpdated = $true
+}
+
+# Refresh current session's PATH so 'smallcode' works immediately
+if ($pathUpdated -or ($env:Path -notlike "*$InstallDir*")) {
+  $env:Path = "$InstallDir;$env:Path"
+  Write-Host "==> Refreshed PATH for this terminal session"
 }
 
 Write-Host ""
