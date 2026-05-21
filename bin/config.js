@@ -104,7 +104,7 @@ async function checkEndpoint(config) {
   if (config.model.provider === 'openai' || baseUrl.includes('/v1')) {
     try {
       const headers = {};
-      const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
+      const apiKey = process.env.SMALLCODE_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
       if (apiKey) {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
@@ -161,7 +161,7 @@ async function checkEndpoint(config) {
  */
 function buildAuthHeaders(config) {
   const headers = { 'Content-Type': 'application/json' };
-  const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
+  const apiKey = process.env.SMALLCODE_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }

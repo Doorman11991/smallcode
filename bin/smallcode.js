@@ -1910,7 +1910,7 @@ async function chatCompletion(config, messages) {
 
     // Build headers — include Authorization if an API key is available
     const headers = { 'Content-Type': 'application/json' };
-    const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
+    const apiKey = process.env.SMALLCODE_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
@@ -2145,7 +2145,7 @@ async function streamFinalResponse(config, messages) {
 
   try {
     const headers = { 'Content-Type': 'application/json' };
-    const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
+    const apiKey = process.env.SMALLCODE_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     if (baseUrl.includes('openrouter.ai')) {
       headers['HTTP-Referer'] = 'https://github.com/Doorman11991/smallcode';
@@ -2263,7 +2263,7 @@ Rules:
   if (config.model.provider === 'openai' || baseUrl.includes('/v1')) {
     try {
       const headers = { 'Content-Type': 'application/json' };
-      const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
+      const apiKey = process.env.SMALLCODE_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY || config.model.apiKey;
       if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
       if (baseUrl.includes('openrouter.ai')) {
         headers['HTTP-Referer'] = 'https://github.com/Doorman11991/smallcode';
