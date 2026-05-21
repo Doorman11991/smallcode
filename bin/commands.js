@@ -768,7 +768,8 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         console.log(`  ${chalk.cyan('/mcp')}           ${chalk.gray('Show connected MCP servers')}`);
         console.log(`  ${chalk.cyan('/skill')}         ${chalk.gray('Manage reusable skills')}`);
         console.log(`  ${chalk.cyan('/plugin')}        ${chalk.gray('List installed plugins')}`);
-        console.log(`  ${chalk.cyan('/sessions')}      ${chalk.gray('List/resume saved sessions')}`);
+        console.log(`  ${chalk.cyan('/provider')}      ${chalk.gray('Configure LLM provider (interactive wizard)')}`);
+        console.log(`  ${chalk.cron('/sessions')}      ${chalk.gray('List/resume saved sessions')}`);
         console.log(`  ${chalk.cyan('/trace')}         ${chalk.gray('View/export execution traces')}`);
         console.log(`  ${chalk.cyan('/eval')} <suite>   ${chalk.gray('Run prompt evaluation')}`);
         console.log(`  ${chalk.cyan('/clear')}         ${chalk.gray('Reset entire session')}`);
@@ -776,6 +777,25 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         console.log('');
         rl.prompt();
         return;
+
+      case '/provider': {
+        const sub = (parts[1] || '').trim();
+        if (sub === 'status' || sub === '--status' || sub === '-s') {
+          const pProviderStatus = require('./provider-wizard/tool-status');
+          console.log(pProviderStatus());
+        } else {
+          const pWizard = require('./provider-wizard/wizard');
+          const { configureProvider } = require('../src/compiled/providers/registry');
+          const result = await pWizard.runWizard({ interactive: true });
+          if (result.success) {
+            try { configureProvider(); } catch {}
+            console.log(result.providerId || '');
+          }
+        }
+        console.log('');
+        rl.prompt();
+        return;
+      }
 
       default: {
         // Try plugin commands — strip leading / for lookup

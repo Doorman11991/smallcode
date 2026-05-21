@@ -46,7 +46,7 @@ const os = require('os');
 const tui = require('./tui');
 const chalk = tui.chalk;
 const { loadConfig: loadConfigModule, checkEndpoint } = require('./config');
-const { TOOLS, COMPOUND_TOOLS, getAllTools: _getAllToolsModule } = require('./tools');
+const { TOOLS, COMPOUND_TOOLS, PROVIDER_TOOLS, getAllTools: _getAllToolsModule } = require('./tools');
 const { runValidation: _runValidationModule } = require('./model_client');
 const { mcpCall, initCodeGraph, killMCP, getMcpProcess } = require('./mcp_bridge');
 const { executeTool: _executeToolModule } = require('./executor');
@@ -435,7 +435,7 @@ function getAllTools(config, stage2Category) {
     return tools;
   }
 }
-let ALL_TOOLS = [...TOOLS, ...COMPOUND_TOOLS];
+let ALL_TOOLS = [...TOOLS, ...COMPOUND_TOOLS, ...PROVIDER_TOOLS];
 
 const MAX_TOOL_CALLS = 500;
 const MAX_IMPROVE_ITERATIONS = 2;
