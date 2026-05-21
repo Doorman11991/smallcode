@@ -746,6 +746,36 @@ async function executeTool(name, args, ctx) {
       return { result: `Category: ${category}. Proceed with your tool call.`, category };
     }
 
+    case 'configure_provider': {
+      const { runWizard } = require('./provider-wizard/wizard');
+      const { configureProvider: activateProvider } = require('../src/compiled/providers/registry');
+      const hasAnyParam = args.provider || args.baseUrl || args.model || args.apiKey;
+      let result;
+      if (!hasAnyParam) {
+        result = await runWizard({ interactive: true });
+      } else {
+        result = await runWizard({
+          interactive: false,
+          provider: args.provider,
+          baseUrl: args.baseUrl,
+          model: args.model,
+          apiKey: args.apiKey,
+          escalationProvider: args.escalationProvider,
+          escalationModel: args.escalationModel,
+        });
+      }
+      if (result.success) {
+        try { activateProvider(); } catch {}
+        return { result: `Provider configured: ${result.provider} (${result.baseUrl}) model=${result.model}${result.escalation ? ` escalation=${result.escalation}` : ''}. Restart SmallCode to apply.` };
+      }
+      return { error: result.error };
+    }
+
+    case 'provider_status': {
+      const { getStatus, formatStatus } = require('./provider-wizard/status');
+      return { result: formatStatus(getStatus()) };
+    }
+
     default: {
       if (mcpClient && mcpClient.isMCPTool(name)) {
         const mcpResult = await mcpClient.callTool(name, args);

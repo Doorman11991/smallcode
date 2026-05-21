@@ -27,6 +27,12 @@ const TOOLS = [
   { type: 'function', function: { name: 'memory_forget', description: 'Delete a memory object by ID.', parameters: { type: 'object', properties: { id: { type: 'string', description: 'Memory object ID to delete' } }, required: ['id'] } } },
 ];
 
+// ─── Provider Tools ─────────────────────────────────────────────────────────
+const PROVIDER_TOOLS = [
+  { type: 'function', function: { name: 'configure_provider', description: 'Configure a provider: set provider type, base URL, model name, API key, and optional escalation fallback. Call without arguments to start the interactive wizard.', parameters: { type: 'object', properties: { provider: { type: 'string', description: 'Provider name: lmstudio, ollama, openrouter, openai, anthropic, deepseek, custom' }, baseUrl: { type: 'string', description: 'Provider base URL (e.g. http://localhost:1234/v1)' }, model: { type: 'string', description: 'Model name to use (e.g. llama-3.1-8b-instruct)' }, apiKey: { type: 'string', description: 'API key (optional, some providers require it)' }, escalationProvider: { type: 'string', description: 'Escalation fallback provider name (optional)' }, escalationModel: { type: 'string', description: 'Escalation fallback model name (optional)' } }, required: [] } } },
+  { type: 'function', function: { name: 'provider_status', description: 'Show current provider configuration status: which provider is active, base URL, model, escalation settings, and whether an API key is set.', parameters: { type: 'object', properties: {}, required: [] } } },
+];
+
 // ─── Compound Tools ──────────────────────────────────────────────────────────
 
 const COMPOUND_TOOLS = [
@@ -48,7 +54,7 @@ const COMPOUND_TOOLS = [
 function getAllTools(config, stage2Category, deps = {}) {
   const pluginTools = deps.pluginLoader ? deps.pluginLoader.getTools() : [];
   const mcpTools = deps.mcpClient ? deps.mcpClient.getToolDefs() : [];
-  const allTools = [...TOOLS, ...COMPOUND_TOOLS, ...pluginTools, ...mcpTools];
+  const allTools = [...TOOLS, ...COMPOUND_TOOLS, ...PROVIDER_TOOLS, ...pluginTools, ...mcpTools];
 
   // If a deterministic tool category was pre-classified, filter tools
   // This skips the LLM-based two_stage routing entirely
