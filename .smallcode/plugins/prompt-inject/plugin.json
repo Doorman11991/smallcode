@@ -1,0 +1,12 @@
+{
+  "name": "prompt-inject",
+  "version": "1.0.0",
+  "description": "Provider plugin that wraps any registered provider and injects content into system prompts. Use for custom instructions, RAG context, or persona overrides.",
+  "providers": [
+    {
+      "name": "prompt-inject",
+      "module": "../../src/compiled/providers/prompt_inject.js",
+      "description": "Wraps any registered provider and injects content into system prompts"
+    }
+  ]
+}
