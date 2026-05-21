@@ -37,7 +37,8 @@ const fs = require('fs');
         // Don't override existing env vars
         if (!process.env[key]) process.env[key] = value;
       }
-      break; // Use first found .env file
+      // Don't break — load all env files so global config is always available.
+      // Project .env values take priority since they're loaded first (line 38 won't overwrite).
     } catch {}
   }
 })();
