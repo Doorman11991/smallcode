@@ -2693,6 +2693,18 @@ async function main() {
     return;
   }
 
+  // Handle /provider even when model IS configured (must come before positional prompt)
+  const providerArg = positional.find(a => a.startsWith('/provider') || a === 'provider');
+  if (providerArg) {
+    const cmd = providerArg.startsWith('/') ? providerArg : '/provider';
+    const rest = positional.filter(a => a !== providerArg).join(' ');
+    const createCommandHandler = require('./commands');
+    const handleCmd = createCommandHandler(config, [], 0, null, null, 0, null, null, null);
+    const mockRl = { prompt: () => {}, close: () => {}, on: () => {}, question: (q, cb) => cb('') };
+    await handleCmd(rest ? `${cmd} ${rest}` : cmd, mockRl);
+    return;
+  }
+
   if (flags.nonInteractive || flags.prompt || positional.length > 0) {
     const prompt = flags.prompt || positional.join(' ');
     await runNonInteractive(config, prompt);
