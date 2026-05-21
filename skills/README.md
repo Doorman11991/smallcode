@@ -4,20 +4,18 @@ Example skills for SmallCode, adapted from the [Willow 2.0](https://github.com/r
 
 ## Install
 
-Bundled skills load automatically from this directory when you run SmallCode from a git checkout or npm install.
+Bundled skills load automatically — no setup needed.
 
-For a single project, copy or symlink into `.smallcode/skills/`:
+**To customize a bundled skill**, copy it to your project or global directory. Project-level skills with the same name override the bundled version:
 
 ```bash
+# Project override
 mkdir -p .smallcode/skills
-cp skills/*.md .smallcode/skills/
-```
+cp /path/to/smallcode/skills/debugging.md .smallcode/skills/
 
-Or install globally:
-
-```bash
+# Global override
 mkdir -p ~/.config/smallcode/skills
-cp skills/*.md ~/.config/smallcode/skills/
+cp /path/to/smallcode/skills/debugging.md ~/.config/smallcode/skills/
 ```
 
 ## Usage
