@@ -2541,13 +2541,61 @@ async function handleMCPToolCall(id, params) {
   return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: result }] }};
 }
 
+// ─── Minimal TUI (no model — plugin commands only) ──────────────────────────
+
+async function startMinimalTUI() {
+  const readline = require('readline');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: chalk.cyan('smallcode> '),
+  });
+
+  const createCommandHandler = require('./commands');
+  const handleCmd = createCommandHandler(config, [], 0, null, null, 0, null, escalationEngine, null);
+
+  rl.prompt();
+
+  rl.on('line', async (line) => {
+    const input = line.trim();
+    if (!input) { rl.prompt(); return; }
+
+    if (input === '/exit' || input === '/quit') {
+      console.log(chalk.gray('\n  Goodbye.\n'));
+      rl.close();
+      process.exit(0);
+    }
+
+    if (input.startsWith('/')) {
+      await handleCmd(input, rl);
+      return;
+    }
+
+    console.log(chalk.gray('  No model configured. Type /provider to set up, or /exit to quit.'));
+    rl.prompt();
+  });
+
+  rl.on('close', () => process.exit(0));
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
   config = loadConfig();
 
+  // Initialize plugins early so they can handle setup (e.g. /provider wizard)
+  pluginLoader = new PluginLoader(process.cwd()).loadAll();
+  skillManager = new SkillManager(process.cwd());
+
   // Check model is configured
   if (!config.model.name) {
+    // If a provider plugin command is available, boot minimal TUI for setup
+    if (pluginLoader.commands['provider']) {
+      console.log('\n  ⚡ SmallCode — no model configured.\n');
+      console.log('  Type /provider to configure a model, or /provider status to check.\n');
+      startMinimalTUI();
+      return;
+    }
     console.error('\n  ✗ No model configured.');
     console.error('  Set SMALLCODE_MODEL in .env, or add [model] name = "..." to smallcode.toml');
     console.error('  See .env.example for setup instructions.\n');

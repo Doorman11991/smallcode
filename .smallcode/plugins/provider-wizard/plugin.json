@@ -1,0 +1,62 @@
+{
+  "name": "provider-wizard",
+  "version": "0.1.0",
+  "description": "Interactive wizard to configure LLM providers, API keys, models, and escalation",
+  "commands": [
+    {
+      "name": "provider",
+      "handler": "./cmd.js"
+    }
+  ],
+  "tools": [
+    {
+      "name": "configure_provider",
+      "description": "Configure a provider: set provider type, base URL, model name, API key, and optional escalation fallback. Call without arguments to start the interactive wizard.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Provider name: lmstudio, ollama, openrouter, openai, anthropic, deepseek, custom"
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "Base URL for the provider API"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model name to use"
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "API key for the provider"
+          },
+          "escalationProvider": {
+            "type": "string",
+            "description": "Optional escalation/fallback provider"
+          },
+          "escalationModel": {
+            "type": "string",
+            "description": "Model for the escalation provider"
+          }
+        }
+      },
+      "handler": "./tool-configure.js"
+    },
+    {
+      "name": "provider_status",
+      "description": "Show current provider configuration status: which providers are configured, API keys present, models, and escalation setup.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "handler": "./tool-status.js"
+    }
+  ],
+  "prompts": [
+    {
+      "inject": "always",
+      "content": "The user has a /provider command to configure LLM providers. Available providers: LM Studio, Ollama, OpenRouter, OpenAI, Anthropic, DeepSeek, and custom endpoints. Use the configure_provider tool to help set up providers programmatically, or suggest the user run /provider for the interactive wizard."
+    }
+  ]
+}
