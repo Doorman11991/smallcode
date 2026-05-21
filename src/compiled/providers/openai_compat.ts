@@ -7,7 +7,7 @@ import type { ChatRequest, ChatResponse, ChatToolCall, IModelProvider } from "./
 import { approxTokens } from "./types";
 import { assertEndpointAllowed } from "./ssrf_guard";
 
-export class OpenAICompatProvider implements IModelProvider {
+export default class OpenAICompatProvider implements IModelProvider {
   readonly name = "openai_compat";
   private endpoint: string;
   private apiKey: string;

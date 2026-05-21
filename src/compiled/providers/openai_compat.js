@@ -5,6 +5,7 @@
 // shim, and OpenAI itself when API key is set.
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpenAICompatProvider = void 0;
+exports.default = void 0;
 const types_1 = require("./types");
 const ssrf_guard_1 = require("./ssrf_guard");
 class OpenAICompatProvider {
@@ -91,6 +92,7 @@ class OpenAICompatProvider {
     }
 }
 exports.OpenAICompatProvider = OpenAICompatProvider;
+exports.default = OpenAICompatProvider;
 /**
  * Map a sequence of per-token logprobs to a single 0..1 confidence value.
  * We use exp(mean(logprob)) — the geometric mean of per-token probabilities.

@@ -110,6 +110,23 @@ Be precise. Don't explain unnecessarily. Just fix it.
 ${systemPromptExtra}`,
     };
 
+    // Plugin-registered providers: use the registry
+    const { providerRegistry } = require('../src/compiled/providers/registry');
+    const pluginProvider = providerRegistry.get(this.provider);
+    if (pluginProvider) {
+      try {
+        return await pluginProvider.chat({
+          model: this.model,
+          messages: [systemMsg, ...messages],
+          temperature: 0.1,
+          maxOutput: 4096,
+          tools: tools || [],
+        });
+      } catch (err) {
+        return { error: `Plugin provider "${this.provider}" failed: ${err.message}` };
+      }
+    }
+
     if (this.provider === 'anthropic') {
       return this._callAnthropic([systemMsg, ...messages], tools);
     } else {

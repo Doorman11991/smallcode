@@ -4,6 +4,7 @@
 
 import type { IModelProvider } from "./types";
 import { OpenAICompatProvider } from "./openai_compat";
+import { providerRegistry } from "./registry";
 
 // Substitute ${ENV_VAR} placeholders in declared values with runtime env vars.
 function _sub(s: string): string {
@@ -98,4 +99,18 @@ export function getModel(name: string): ModelEntry {
 export function listModelNames(): string[] {
   if (!_models) _models = _buildModels();
   return Object.keys(_models).sort();
+}
+
+/**
+ * Resolve a provider by name. Checks the plugin registry first;
+ * falls back to creating a default OpenAICompatProvider with the
+ * configured baseUrl.
+ */
+export function resolveProvider(name: string): IModelProvider {
+  const fromRegistry = providerRegistry.get(name);
+  if (fromRegistry) return fromRegistry;
+  const baseUrl = _sub("${SMALLCODE_BASE_URL}") || "http://localhost:1234/v1";
+  const provider = new OpenAICompatProvider(baseUrl);
+  providerRegistry.register(name, provider);
+  return provider;
 }

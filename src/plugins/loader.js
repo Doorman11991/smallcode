@@ -19,12 +19,14 @@
 //   "tools": [{ "name": "...", "description": "...", "parameters": {...}, "handler": "./handler.js" }],
 //   "prompts": [{ "inject": "always|backend|coding", "content": "..." }],
 //   "commands": [{ "name": "/mycmd", "description": "...", "handler": "./cmd.js" }],
-//   "hooks": [{ "event": "post_tool", "filter": ["write_file"], "handler": "./hook.js" }]
+//   "hooks": [{ "event": "post_tool", "filter": ["write_file"], "handler": "./hook.js" }],
+//   "providers": [{ "name": "...", "module": "./adapter.js", "options": {} }]
 // }
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { providerRegistry } = require('../compiled/providers/registry');
 
 class PluginLoader {
   constructor(projectDir) {
@@ -34,6 +36,8 @@ class PluginLoader {
     this.commands = {};     // /command → handler
     this.prompts = [];      // System prompt injections
     this.hooks = [];        // Event hooks
+    this.providers = {};    // name → IModelProvider instance
+    this.errors = [];       // { dir, message } for diagnostics
   }
 
   // Load all plugins from project + user dirs
@@ -137,9 +141,32 @@ class PluginLoader {
         }
       }
 
+      // Register providers
+      if (manifest.providers) {
+        for (const spec of manifest.providers) {
+          try {
+            const modulePath = path.resolve(pluginDir, spec.module);
+            const Export = require(modulePath);
+            const ProviderClass = Export.default || Export;
+            const instance = new ProviderClass(spec.options || {});
+            if (!instance.chat || !instance.name) {
+              throw new Error(`Provider "${spec.name}" must implement .chat() and .name`);
+            }
+            const caps = spec.capabilities || {};
+            providerRegistry.register(spec.name, instance, caps);
+            this.providers[spec.name] = instance;
+          } catch (e) {
+            const msg = `Failed to load provider "${spec.name}": ${e.message}`;
+            console.error(`[plugin:${plugin.name}] ${msg}`);
+            this.errors.push({ dir: pluginDir, message: msg });
+          }
+        }
+      }
+
       this.plugins.push(plugin);
     } catch (e) {
-      // Silently skip broken plugins
+      // Store error for diagnostics, but don't crash
+      this.errors.push({ dir: pluginDir, message: e.message });
     }
   }
 
@@ -201,6 +228,11 @@ class PluginLoader {
       return `Error in plugin command: ${e.message}`;
     }
     return null;
+  }
+
+  // Get error diagnostics for failed plugin loads
+  getErrors() {
+    return this.errors;
   }
 
   // List all plugins for display

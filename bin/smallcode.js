@@ -1965,6 +1965,58 @@ async function chatCompletion(config, messages) {
       }
     };
 
+    // Plugin-registered providers: call directly, bypass fetch
+    const { providerRegistry } = require('../src/compiled/providers/registry');
+    const pluginProvider = providerRegistry.get(config.model.provider);
+    if (pluginProvider) {
+      _stopSpinner();
+      try {
+        const chatResp = await pluginProvider.chat({
+          model: body.model,
+          messages: body.messages,
+          temperature: body.temperature,
+          maxOutput: body.max_tokens,
+          tools: body.tools,
+        }, controller.signal);
+        clearTimeout(timeout);
+
+        // Translate ChatResponse → OpenAI-compatible format for downstream consumers
+        const data = {
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: chatResp.content,
+              tool_calls: chatResp.tool_calls || [],
+            },
+            finish_reason: chatResp.tool_calls?.length ? 'tool_calls' : 'stop',
+          }],
+          usage: chatResp.usage ? {
+            prompt_tokens: chatResp.usage.promptTokens,
+            completion_tokens: chatResp.usage.completionTokens,
+            total_tokens: chatResp.usage.totalTokens,
+          } : undefined,
+        };
+
+        if (tokenTracker && data.usage) {
+          tokenTracker.record(data, config.model.name);
+        }
+        if (data.usage) {
+          tokenMonitor.recordCall(data.usage.prompt_tokens, data.usage.completion_tokens);
+          traceRecorder.recordTokens(data.usage.prompt_tokens, data.usage.completion_tokens);
+          if (chargeBudget) {
+            try { chargeBudget('run_turn', { tokens: (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0) }); } catch {}
+          }
+        }
+        return data;
+      } catch (pluginErr) {
+        clearTimeout(timeout);
+        const msg = pluginErr.message || 'Plugin provider failed';
+        console.log(`  \x1b[31m✗ Plugin provider "${config.model.provider}": ${msg}\x1b[0m`);
+        if (_fullscreenRef) _fullscreenRef.addTool('error', 'err', `${config.model.provider}: ${msg.slice(0, 80)}`);
+        return null;
+      }
+    }
+
     let response;
     try {
       response = await fetch(`${baseUrl}/chat/completions`, {

@@ -93,6 +93,13 @@ function loadConfig(flags = {}) {
 async function checkEndpoint(config) {
   const baseUrl = config.model.baseUrl || process.env.OLLAMA_HOST || 'http://localhost:11434';
 
+  // Plugin-registered providers handle their own connectivity
+  const { providerRegistry } = require('../src/compiled/providers/registry');
+  if (providerRegistry.has(config.model.provider)) {
+    console.log(`  Using plugin provider: ${config.model.provider}`);
+    return true;
+  }
+
   // OpenAI-compatible endpoint (LM Studio, vLLM, OpenRouter, etc.)
   if (config.model.provider === 'openai' || baseUrl.includes('/v1')) {
     try {
