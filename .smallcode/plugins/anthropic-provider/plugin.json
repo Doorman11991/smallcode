@@ -1,0 +1,21 @@
+{
+  "name": "anthropic-provider",
+  "version": "0.1.0",
+  "description": "Anthropic Claude provider for SmallCode",
+  "init": "./init.js",
+  "shutdown": "./cleanup.js",
+  "permissions": { "read": true, "network": true },
+  "providers": [
+    {
+      "name": "anthropic",
+      "module": "./adapter.js",
+      "options": { "apiKeyEnv": "ANTHROPIC_API_KEY", "baseUrl": "https://api.anthropic.com/v1" },
+      "capabilities": { "tools": true, "streaming": true, "vision": true, "tokenCounting": "exact" }
+    }
+  ],
+  "hooks": [
+    { "event": "pre_request", "filter": ["anthropic"], "handler": "./pre-request.js" },
+    { "event": "post_request", "filter": ["anthropic"], "handler": "./post-request.js" },
+    { "event": "on_error", "handler": "./on-error.js" }
+  ]
+}
