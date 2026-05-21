@@ -495,47 +495,71 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         } else if (sub === 'install') {
           const pkg = parts[2];
           if (!pkg) {
-            console.log(chalk.gray('  Usage: /plugin install <npm-package-or-github-url>'));
-            console.log(chalk.gray('  Example: /plugin install smallcode-plugin-lint'));
-            console.log(chalk.gray('  Example: /plugin install github:user/repo'));
+            console.log(chalk.gray('  Usage: /plugin install <pkg> [--scope project|user|global]'));
+            console.log(chalk.gray('  Examples:'));
+            console.log(chalk.gray('    /plugin install smallcode-plugin-lint'));
+            console.log(chalk.gray('    /plugin install github:user/repo --scope global'));
+            console.log(chalk.gray('    /plugin install @scope/pkg --scope user'));
           } else {
-            const { execFileSync } = require('child_process');
-            const pluginsDir = require('path').join(process.cwd(), '.smallcode', 'plugins');
-            const fs = require('fs');
-            if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir, { recursive: true });
-            // Validate package name — only allow npm-safe characters to prevent injection.
-            // Legitimate names: @scope/pkg, pkg-name, github:user/repo
-            if (!/^[@a-zA-Z0-9._\-/: ]+$/.test(pkg)) {
-              console.log(chalk.red(`  ✗ Invalid package name: ${pkg}`));
+            // Parse --scope flag
+            let scope = 'project';
+            const scopeIdx = parts.indexOf('--scope');
+            if (scopeIdx !== -1 && parts[scopeIdx + 1]) {
+              scope = parts[scopeIdx + 1];
+            }
+            const validScopes = { project: '.smallcode', user: '.smallcode', global: '.config/smallcode' };
+            if (!validScopes[scope]) {
+              console.log(chalk.red(`  ✗ Unknown scope "${scope}". Use: project, user, or global.`));
             } else {
-              console.log(chalk.gray(`  Installing ${pkg}...`));
-              try {
-                execFileSync('npm', ['install', '--prefix', pluginsDir, pkg], { encoding: 'utf-8', timeout: 60000, cwd: process.cwd() });
-                console.log(chalk.green(`  ✓ Installed ${pkg}`));
-                console.log(chalk.gray('  Restart SmallCode to activate.'));
-              } catch (e) {
-                console.log(chalk.red(`  ✗ Install failed: ${((e.stderr || '') + (e.message || '')).slice(0, 200)}`));
+              const os = require('os');
+              const { execFileSync } = require('child_process');
+              const pluginsDir = scope === 'project'
+                ? require('path').join(process.cwd(), '.smallcode', 'plugins')
+                : require('path').join(os.homedir(), validScopes[scope], 'plugins');
+              const fs = require('fs');
+              if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir, { recursive: true });
+              if (!/^[@a-zA-Z0-9._\-/: ]+$/.test(pkg)) {
+                console.log(chalk.red(`  ✗ Invalid package name: ${pkg}`));
+              } else {
+                console.log(chalk.gray(`  Installing ${pkg} (${scope} → ${pluginsDir})...`));
+                try {
+                  execFileSync('npm', ['install', '--prefix', pluginsDir, pkg], { encoding: 'utf-8', timeout: 60000, cwd: process.cwd() });
+                  console.log(chalk.green(`  ✓ Installed ${pkg}`));
+                  console.log(chalk.gray('  Restart SmallCode to activate.'));
+                } catch (e) {
+                  console.log(chalk.red(`  ✗ Install failed: ${((e.stderr || '') + (e.message || '')).slice(0, 200)}`));
+                }
               }
             }
           }
         } else if (sub === 'remove') {
           const pkg = parts[2];
           if (!pkg) {
-            console.log(chalk.gray('  Usage: /plugin remove <name>'));
+            console.log(chalk.gray('  Usage: /plugin remove <name> [--scope project|user|global]'));
           } else {
-            const pluginDir = require('path').join(process.cwd(), '.smallcode', 'plugins', pkg);
+            let scope = 'project';
+            const scopeIdx = parts.indexOf('--scope');
+            if (scopeIdx !== -1 && parts[scopeIdx + 1]) {
+              scope = parts[scopeIdx + 1];
+            }
+            const os = require('os');
+            const scopeMap = { project: '.smallcode', user: '.smallcode', global: '.config/smallcode' };
+            const pluginDir = scope === 'project'
+              ? require('path').join(process.cwd(), '.smallcode', 'plugins', pkg)
+              : require('path').join(os.homedir(), scopeMap[scope], 'plugins', pkg);
             const fs = require('fs');
             if (fs.existsSync(pluginDir)) {
               fs.rmSync(pluginDir, { recursive: true });
-              console.log(chalk.green(`  ✓ Removed ${pkg}`));
+              console.log(chalk.green(`  ✓ Removed ${pkg} (${scope})`));
             } else {
-              console.log(chalk.red(`  Plugin "${pkg}" not found in .smallcode/plugins/`));
+              console.log(chalk.red(`  Plugin "${pkg}" not found in ${scope} plugins dir`));
             }
           }
         } else {
-          console.log(chalk.gray('  /plugin list              Show installed plugins'));
-          console.log(chalk.gray('  /plugin install <pkg>     Install from npm/github'));
-          console.log(chalk.gray('  /plugin remove <name>     Remove a plugin'));
+          console.log(chalk.gray('  /plugin list                           Show installed plugins'));
+          console.log(chalk.gray('  /plugin install <pkg> [--scope ...]    Install (default: project)'));
+          console.log(chalk.gray('  /plugin remove <name> [--scope ...]    Remove a plugin'));
+          console.log(chalk.gray('  Scopes: project (./.smallcode), user (~/.smallcode), global (~/.config/smallcode)'));
         }
         console.log('');
         rl.prompt();
@@ -754,11 +778,12 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         return;
 
       default: {
-        // Try plugin commands before showing "unknown"
+        // Try plugin commands — strip leading / for lookup
         const { PluginLoader } = require('../src/plugins/loader');
         const pl = new PluginLoader(process.cwd()).loadAll();
-        if (pl.commands[parts[0]]) {
-          const result = await pl.executeCommand(parts[0], parts.slice(1).join(' '), { config, conversationHistory });
+        const cmdName = parts[0].replace(/^\//, '');
+        if (pl.commands[cmdName]) {
+          const result = await pl.executeCommand(cmdName, parts.slice(1).join(' '), { config, conversationHistory });
           if (result) console.log(result);
         } else {
           console.log(chalk.gray(`  Unknown: ${parts[0]}. Type /help`));

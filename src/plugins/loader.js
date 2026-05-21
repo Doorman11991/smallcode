@@ -48,10 +48,11 @@ class PluginLoader {
     this.errors = [];       // { dir, message } for diagnostics
   }
 
-  // Load all plugins from project + user dirs
+  // Load all plugins from project, user, and global dirs
   loadAll() {
     const dirs = [
       path.join(this.projectDir, '.smallcode', 'plugins'),
+      path.join(os.homedir(), '.smallcode', 'plugins'),
       path.join(os.homedir(), '.config', 'smallcode', 'plugins'),
     ];
 
@@ -59,7 +60,9 @@ class PluginLoader {
       if (!fs.existsSync(dir)) continue;
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isDirectory()) {
+        // isDirectory() doesn't follow symlinks — check stat for symlink dirs
+        const isDir = entry.isDirectory() || (entry.isSymbolicLink() && fs.statSync(path.join(dir, entry.name)).isDirectory());
+        if (isDir) {
           this._loadPlugin(path.join(dir, entry.name));
         } else if (entry.name.endsWith('.json') && entry.name !== 'package.json') {
           // Single-file plugin (just a manifest with inline content)
