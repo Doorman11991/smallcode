@@ -2594,6 +2594,7 @@ async function main() {
     if (providerArg) {
       const cmd = providerArg.startsWith('/') ? providerArg : '/provider';
       const rest = positional.filter(a => a !== providerArg).join(' ');
+      const createCommandHandler = require('./commands');
       const handleCmd = createCommandHandler(config, [], 0, null, null, 0, null, null, null);
       const mockRl = { prompt: () => {}, close: () => {}, on: () => {}, question: (q, cb) => cb('') };
       await handleCmd(rest ? `${cmd} ${rest}` : cmd, mockRl);
