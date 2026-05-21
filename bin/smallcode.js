@@ -2589,17 +2589,20 @@ async function main() {
 
   // Check model is configured
   if (!config.model.name) {
-    // If a provider plugin command is available, boot minimal TUI for setup
-    if (pluginLoader.commands['provider']) {
-      console.log('\n  ⚡ SmallCode — no model configured.\n');
-      console.log('  Type /provider to configure a model, or /provider status to check.\n');
-      startMinimalTUI();
+    // Allow /provider commands even without a model configured
+    const providerArg = positional.find(a => a.startsWith('/provider') || a === 'provider');
+    if (providerArg) {
+      const cmd = providerArg.startsWith('/') ? providerArg : '/provider';
+      const rest = positional.filter(a => a !== providerArg).join(' ');
+      const handleCmd = createCommandHandler(config, [], 0, null, null, 0, null, null, null);
+      const mockRl = { prompt: () => {}, close: () => {}, on: () => {}, question: (q, cb) => cb('') };
+      await handleCmd(rest ? `${cmd} ${rest}` : cmd, mockRl);
       return;
     }
-    console.error('\n  ✗ No model configured.');
-    console.error('  Set SMALLCODE_MODEL in .env, or add [model] name = "..." to smallcode.toml');
-    console.error('  See .env.example for setup instructions.\n');
-    process.exit(1);
+    console.log('\n  ⚡ SmallCode — no model configured.\n');
+    console.log('  Type /provider to configure a model, or /provider status to check.\n');
+    startMinimalTUI();
+    return;
   }
 
   // Initialize escalation engine
