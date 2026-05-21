@@ -4,6 +4,7 @@
 const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { PROVIDERS, parseEnvFile } = require('./status');
 
 async function ask(rl, question, defaultVal) {
