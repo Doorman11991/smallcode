@@ -111,6 +111,8 @@ async function runWizard(options = {}) {
   const cwd = process.cwd();
   const envPath = path.join(cwd, '.env');
   const tomlPath = path.join(cwd, 'smallcode.toml');
+  const globalConfigDir = path.join(os.homedir(), '.config', 'smallcode');
+  const globalEnvPath = path.join(globalConfigDir, '.env');
 
   // Load existing env
   const existingEnv = parseEnvFile(envPath);
@@ -229,7 +231,8 @@ async function runWizard(options = {}) {
       }
     }
 
-    // Step 7: Write .env
+    // Step 7: Write provider config to global env (~/.config/smallcode/smallcode.env)
+    // so it persists across projects. Project .env can still override.
     const envVars = {
       SMALLCODE_PROVIDER: provider,
       SMALLCODE_BASE_URL: baseUrl,
@@ -239,8 +242,18 @@ async function runWizard(options = {}) {
       envVars[providerInfo.keyEnv] = apiKey;
     }
 
-    const merged = mergeEnvFile(envPath, envVars);
-    fs.writeFileSync(envPath, merged, 'utf-8');
+    // Always write to global config
+    try {
+      fs.mkdirSync(globalConfigDir, { recursive: true });
+      const globalMerged = mergeEnvFile(globalEnvPath, envVars);
+      fs.writeFileSync(globalEnvPath, globalMerged, 'utf-8');
+    } catch {}
+
+    // Also write to project .env if it exists or if we're in the project root
+    if (fs.existsSync(envPath) || fs.existsSync(tomlPath)) {
+      const merged = mergeEnvFile(envPath, envVars);
+      fs.writeFileSync(envPath, merged, 'utf-8');
+    }
 
     // Step 8: Write escalation to smallcode.toml
     if (escalationProvider) {
