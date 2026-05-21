@@ -176,6 +176,9 @@ Modern reasoning models (Qwen3, DeepSeek R1, GPT-5 reasoning) can spend thousand
 ### Knowledge Injection
 Drop short reference notes into a `knowledge/` directory and the most relevant ones get injected into the system prompt based on keyword overlap with your message. Designed for small models that benefit from algorithm cheat sheets or syntax reminders inline. See `knowledge/README.md` for the format. Configurable budget (default 1500 tokens) via `SMALLCODE_KNOWLEDGE_MAX_TOKENS`.
 
+### Bundled Skills
+Six dev-methodology skills ship in `skills/` (brainstorming, debugging, tdd, iterative-retrieval, learn, external-guard). They load automatically alongside project skills in `.smallcode/skills/`. Use `/skill list` and `/skill use <name>`. See `skills/README.md`. Adapted from [Willow 2.0 Fylgja](https://github.com/rudi193-cmd/willow-2.0/tree/master/willow/fylgja/skills).
+
 ### Read-Before-Write Guard
 Tracks which paths the model has read this session. First `write_file` to an existing unread file is refused with a hint to `read_file` first; second attempt allowed (so legitimate full-replace intents succeed). New files always permitted. `patch` counts as a read. Disable with `SMALLCODE_WRITE_GUARD=false`.
 

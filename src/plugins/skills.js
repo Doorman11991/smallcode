@@ -5,6 +5,7 @@
 // Skill locations:
 //   .smallcode/skills/   — project-level
 //   ~/.config/smallcode/skills/  — user-level (global)
+//   <package>/skills/    — bundled defaults (lowest priority)
 //
 // Skill format (markdown with YAML frontmatter):
 // ---
@@ -39,6 +40,7 @@ class SkillManager {
     return [
       path.join(this.projectDir, '.smallcode', 'skills'),
       path.join(os.homedir(), '.config', 'smallcode', 'skills'),
+      path.join(__dirname, '..', '..', 'skills'),
     ];
   }
 
