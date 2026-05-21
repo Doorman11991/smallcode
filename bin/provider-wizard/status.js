@@ -11,7 +11,7 @@ const PROVIDERS = {
   openai: { name: 'OpenAI', defaultUrl: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY' },
   anthropic: { name: 'Anthropic', defaultUrl: 'https://api.anthropic.com/v1', keyEnv: 'ANTHROPIC_API_KEY' },
   deepseek: { name: 'DeepSeek', defaultUrl: 'https://api.deepseek.com/v1', keyEnv: 'DEEPSEEK_API_KEY' },
-  custom: { name: 'Custom endpoint', defaultUrl: '', keyEnv: null },
+  custom: { name: 'Custom endpoint', defaultUrl: '', keyEnv: 'SMALLCODE_API_KEY' },
 };
 
 function parseEnvFile(filePath) {

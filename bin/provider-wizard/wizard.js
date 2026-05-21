@@ -42,15 +42,17 @@ function maskKey(key) {
   return key.slice(0, 4) + '***' + key.slice(-4);
 }
 
-async function validateApiKey(provider, apiKey) {
+async function validateApiKey(provider, apiKey, baseUrl) {
   if (!apiKey) return { valid: false, error: 'No API key provided' };
 
   const info = PROVIDERS[provider];
   if (!info || !info.keyEnv) return { valid: true, error: null }; // local providers, skip check
 
+  const url = (baseUrl || info.defaultUrl || '').replace(/\/+$/, '');
+  if (!url) return { valid: true, error: null }; // no URL to validate against
+
   try {
-    const url = `${info.defaultUrl}/models`;
-    const res = await fetch(url, {
+    const res = await fetch(`${url}/models`, {
       headers: { 'Authorization': `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(10000),
     });
@@ -183,7 +185,7 @@ async function runWizard(options = {}) {
     // Step 4: Validate API key
     if (providerInfo.keyEnv && apiKey && isInteractive) {
       process.stdout.write('  Validating API key...');
-      const result = await validateApiKey(provider, apiKey);
+      const result = await validateApiKey(provider, apiKey, baseUrl);
       if (result.valid) {
         console.log(` \x1b[32mvalid\x1b[0m`);
       } else {
