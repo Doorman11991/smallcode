@@ -22,7 +22,9 @@
 //   "hooks": [{ "event": "pre_request|post_request|on_error|session_start|session_end|post_tool", "filter": ["write_file"], "handler": "./hook.js" }],
 //   "init": "./init.js",
 //   "shutdown": "./cleanup.js",
-//   "providers": [{ "name": "...", "module": "./adapter.js", "options": {} }]
+//   "providers": [{ "name": "...", "module": "./adapter.js", "options": {}, "capabilities": { "tools": true, "streaming": true } }],
+//   "permissions": { "read": true, "write": true, "execute": false, "network": true },
+//   "mcpServers": { "my-server": { "command": "./server.js", "args": [], "transport": "stdio" } }
 // }
 
 const fs = require('fs');
@@ -41,6 +43,8 @@ class PluginLoader {
     this.providers = {};    // name → IModelProvider instance
     this.initHandlers = [];   // async init handlers from plugin manifests
     this.shutdownHandlers = []; // async shutdown handlers from plugin manifests
+    this.permissions = {};   // plugin name → { read, write, execute, network }
+    this.mcpServers = {};    // plugin name → { serverName: { command, args, transport } }
     this.errors = [];       // { dir, message } for diagnostics
   }
 
@@ -205,6 +209,31 @@ class PluginLoader {
         }
       }
 
+      // Register permissions
+      if (manifest.permissions) {
+        this.permissions[plugin.name] = {
+          read: !!manifest.permissions.read,
+          write: !!manifest.permissions.write,
+          execute: !!manifest.permissions.execute,
+          network: !!manifest.permissions.network,
+        };
+      } else {
+        // Default: read-only, no write/execute/network
+        this.permissions[plugin.name] = { read: true, write: false, execute: false, network: false };
+      }
+
+      // Register MCP server declarations
+      if (manifest.mcpServers) {
+        this.mcpServers[plugin.name] = {};
+        for (const [serverName, serverDef] of Object.entries(manifest.mcpServers)) {
+          this.mcpServers[plugin.name][serverName] = {
+            command: serverDef.command,
+            args: serverDef.args || [],
+            transport: serverDef.transport || 'stdio',
+          };
+        }
+      }
+
       this.plugins.push(plugin);
     } catch (e) {
       // Store error for diagnostics, but don't crash
@@ -270,6 +299,28 @@ class PluginLoader {
       return `Error in plugin command: ${e.message}`;
     }
     return null;
+  }
+
+  // Get permissions for a plugin
+  getPermissions(pluginName) {
+    return this.permissions[pluginName] || null;
+  }
+
+  // Check if a plugin has a specific permission
+  hasPermission(pluginName, perm) {
+    const p = this.permissions[pluginName];
+    return p ? !!p[perm] : false;
+  }
+
+  // Get all MCP server declarations across plugins
+  getMCPServers() {
+    const servers = {};
+    for (const [plugin, pluginServers] of Object.entries(this.mcpServers)) {
+      for (const [name, def] of Object.entries(pluginServers)) {
+        servers[`${plugin}/${name}`] = def;
+      }
+    }
+    return servers;
   }
 
   // Get error diagnostics for failed plugin loads
