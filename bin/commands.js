@@ -746,6 +746,63 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         return;
       }
 
+      case '/contract': {
+        const { getStore } = require('../src/session/contract_store');
+        const { formatStatus, statusPayload } = require('../src/session/contract_tools');
+        const store = getStore(process.cwd());
+        const sub = parts[1];
+
+        if (!sub || sub === 'status') {
+          const payload = statusPayload(store);
+          console.log('');
+          console.log(formatStatus(payload));
+          console.log('');
+        } else if (sub === 'list') {
+          const all = store.list();
+          if (all.length === 0) {
+            console.log(chalk.gray('  No contracts. Use /contract create <title>...'));
+          } else {
+            const activeId = store.activeId();
+            for (const row of all) {
+              const marker = row.id === activeId ? chalk.green('●') : ' ';
+              const ds = row.doneStatus;
+              console.log(`  ${marker} ${chalk.cyan(row.id)}  [${row.status}]  ${row.title}  ${chalk.gray(`(${ds.passed}/${ds.total})`)}`);
+            }
+          }
+          console.log('');
+        } else if (sub === 'activate') {
+          const id = parts[2];
+          if (!id) { console.log(chalk.gray('  Usage: /contract activate <id>')); }
+          else {
+            try { store.activate(id); console.log(chalk.green(`  ✓ Activated ${id}`)); }
+            catch (e) { console.log(chalk.red(`  ${e.message}`)); }
+          }
+          console.log('');
+        } else if (sub === 'deactivate') {
+          store.deactivate();
+          console.log(chalk.gray('  Active contract cleared.'));
+          console.log('');
+        } else if (sub === 'abort') {
+          const reason = parts.slice(2).join(' ') || '';
+          try { const c = store.abort(reason); console.log(chalk.yellow(`  ⊘ Aborted ${c.id}`)); }
+          catch (e) { console.log(chalk.red(`  ${e.message}`)); }
+          console.log('');
+        } else {
+          console.log(chalk.gray('  /contract                Show active contract status'));
+          console.log(chalk.gray('  /contract list           List all contracts'));
+          console.log(chalk.gray('  /contract activate <id>  Switch active contract'));
+          console.log(chalk.gray('  /contract deactivate     Clear active contract'));
+          console.log(chalk.gray('  /contract abort <reason> Abort the active contract'));
+          console.log(chalk.gray(''));
+          console.log(chalk.gray('  Note: contracts are normally created by the agent via the'));
+          console.log(chalk.gray('        contract_create tool. The model can\'t deliver "done"'));
+          console.log(chalk.gray('        while any assertion is pending or failed.'));
+          console.log('');
+        }
+        rl.prompt();
+        return;
+      }
+
       case '/help':
         console.log('');
         console.log(chalk.bold('  Commands'));
@@ -758,6 +815,7 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         console.log(`  ${chalk.cyan('/git')} <cmd>     ${chalk.gray('Run any git command')}`);
         console.log(`  ${chalk.cyan('/loop')} <file>   ${chalk.gray('Validate + auto-fix')}`);
         console.log(`  ${chalk.cyan('/memory')}        ${chalk.gray('View/manage project memory')}`);
+        console.log(`  ${chalk.cyan('/contract')}      ${chalk.gray('Definition-of-Done contract')}`);
         console.log(`  ${chalk.cyan('/undo')}          ${chalk.gray('Revert uncommitted changes')}`);
         console.log(`  ${chalk.cyan('/compact')}       ${chalk.gray('Trim conversation history')}`);
         console.log(`  ${chalk.cyan('/escalation')}    ${chalk.gray('View model escalation status')}`);

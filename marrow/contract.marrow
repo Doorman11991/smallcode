@@ -1,0 +1,132 @@
+// SmallCode — Contract (Definition of Done) MarrowScript Declaration
+//
+// Compiles to a deterministic per-project contract runtime. Inspired by itsy's
+// `crates/itsy/src/session/contract.rs` — a list of testable assertions the
+// model commits to up-front, scaled for a single-session agent on a small
+// quantised model. The agent works through them, marking each `passed` or
+// `failed` with command-line evidence. The model can't claim "done" while any
+// assertion is still `pending` — there is a hard guard.
+//
+// Per AGENTS.md: declared in MarrowScript so the runtime (caching, validation,
+// retry) is generated for free; the JS runtime under bin/contract.js is the
+// hand-port until the compiler emits Node output.
+
+system SmallCodeContract {
+  domain: cognitive_scaffold
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ENTITIES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  entity Assertion {
+    owns: [
+      id: string,
+      text: string,
+      // pending | passed | failed | skipped
+      state: string,
+      evidence: string,
+      // last command-line evidence (stringified CommandEvidence)
+      last_check: string
+    ]
+  }
+
+  entity CommandEvidence {
+    owns: [
+      command: string,
+      exit_code: int,
+      observation: string,
+      timestamp: string
+    ]
+  }
+
+  entity Contract {
+    owns: [
+      id: string,
+      title: string,
+      created_at: string,
+      // draft | active | completed | aborted
+      status: string,
+      brief: string,
+      assertions: string,
+      features: string
+    ]
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROMPT — propose assertions from a brief
+  // Used by /contract create when the user supplies a brief but no
+  // pre-written assertion list. Constrained output: numbered list, one
+  // assertion per line, each phrased as a verifiable claim.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  prompt propose_assertions(brief: string) {
+    model: TinyClassifier
+    template: "extension_point:tmpl_propose_assertions"
+    returns: string
+    timeout: 10s
+    idempotent: true
+    validate: schema_only
+    on_invalid: retry
+    retry: { max_attempts: 2, backoff: fixed, interval: 200ms }
+    cache: { key: hash(brief), ttl: 30m }
+  }
+
+  extension_point tmpl_propose_assertions(brief: string) {
+    returns: string
+    stable: true
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CAPABILITIES — declarative state transitions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  capability create_contract(title: string, brief: string) {
+    cognition: semantic_slice using {
+      task: brief,
+      max_files: 4,
+      hop_depth: 1
+    }
+    returns: Contract
+    sync: transactional
+  }
+
+  capability mark_assertion(contract_id: string, assertion_id: string, state: string) {
+    cognition: semantic_slice using {
+      task: assertion_id,
+      max_files: 0,
+      hop_depth: 0
+    }
+    returns: string
+    sync: transactional
+  }
+
+  capability check_done(contract_id: string) {
+    cognition: semantic_slice using {
+      task: contract_id,
+      max_files: 0,
+      hop_depth: 0
+    }
+    returns: string
+    sync: eventual
+    idempotent: true
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // POLICY — done-guard
+  // The agent cannot deliver a final assistant message claiming the work is
+  // complete while any assertion is still `pending` or `failed`. This is the
+  // hard-fail upgrade over the existing snapshot/auto-rollback feature.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  policy done_guard {
+    audit: true
+    cost_budgets: [
+      {
+        scope: per_feature: "check_done"
+        window: 1m
+        cap_calls: 30
+        on_exceeded: { action: error, code: "CONTRACT_CHECK_RATE_LIMIT" }
+      }
+    ]
+  }
+}

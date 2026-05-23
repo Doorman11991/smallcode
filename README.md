@@ -185,11 +185,16 @@ Tracks which paths the model has read this session. First `write_file` to an exi
 ### Tool-Call Deduplication
 Identical pure-tool calls within a sliding window are short-circuited with a cached result instead of re-executing. Only applies to read-only tools (`read_file`, `search`, `graph_search`, etc.) — never to anything with side effects. Saves both context and latency on small models that loop. Disable with `SMALLCODE_DEDUP=false`.
 
+A second, stricter guard handles **idempotent-write tools** (`memory_remember`, `memory_forget`): identical calls in the same turn are short-circuited with `[already stored this turn]` instead of re-executing. Resets between turns rather than between sessions. Closes the spam-loop gap where small models could call `memory_remember` 30+ times with the same args. Disable with `SMALLCODE_IDEMPOTENT_WRITE_DEDUP=false`.
+
 ### Evidence Store
 Automated capture of "what was tried, what worked, what failed" per task. Stored as searchable memory objects in the existing memory MCP module so they flow through FTS5 + staleness-decay loading on future tasks rather than always hogging context. The model learns from past sessions: it sees that `pip install` failed last time on this Python version, or that `npm test` hangs without `--run`. Disable with `SMALLCODE_EVIDENCE_DISABLE=true`.
 
 ### Plan-Then-Execute Mode
 For multi-step tasks (refactors, multi-file features, multi-imperative prompts), SmallCode asks the model to emit a numbered plan FIRST, then re-injects that plan as an anchor on subsequent turns. Reduces drift on long traces — the model can't "forget" step 3 by the time it finishes step 1. Heuristic-based — simple tasks like "create hello.py" don't trigger planning. Configure with `SMALLCODE_PLAN=true|false`.
+
+### Contract / Definition of Done
+For tasks where "done" should be hard-fail rather than self-reported, SmallCode supports per-project **contracts** — a declarative list of testable assertions the model commits to up-front. The agent cannot deliver a final "I'm done"-shaped response while any assertion remains `pending` or `failed`. The model uses `contract_create` to declare assertions, `contract_assert_pass` / `contract_assert_fail` / `contract_assert_skip` to record progress with command-line evidence, and `contract_status` to inspect remaining blockers. State persists to `.smallcode/contracts/<id>/` (state.json, contract.md, assertions.md, log.jsonl). Slash command `/contract` lists, activates, and aborts contracts. Inspired by [jukefr/itsy](https://github.com/jukefr/itsy)'s same-named feature. Disable the done-guard with `SMALLCODE_CONTRACT=false`.
 
 ### Snapshot & Auto-Rollback
 Before each agent turn, SmallCode opens a file snapshot checkpoint. Every `write_file` and `patch` records its pre-edit content. If validation hard-fails and all retries are exhausted, set `SMALLCODE_SNAPSHOT_AUTO_ROLLBACK=true` to automatically revert all edits in the turn back to the checkpoint state. All snapshots persisted to `.smallcode/snapshots/` for manual audit. Disable with `SMALLCODE_SNAPSHOT=false`.
@@ -239,6 +244,17 @@ npm run bench:polyglot
 npm run bench:tools
 ```
 
+### Benchmark Diff Tool
+Compare two harness runs (or a stored baseline against a fresh run) and get an exit-coded verdict you can use in CI: `0` improved, `1` regressed, `2` noise.
+
+```bash
+npm run bench:diff bench/baselines/main bench/baselines/feature
+# or with a custom threshold:
+node bench/diff.js bench/baselines/main bench/baselines/feature --threshold 0.05 --json
+```
+
+Reports mean reward delta, per-task pass-count moves (no task should regress), wall-clock delta, and tool-call delta. Pairs with the `benchmark-driven-development` skill at `skills/benchmark-driven-development.md` — the discipline of measure-first / change-second / measure-again before any agent-behaviour change ships. Adapted from [jukefr/itsy](https://github.com/jukefr/itsy).
+
 
 ## Commands
 
@@ -252,6 +268,7 @@ npm run bench:tools
 | `/trace` | List/show/export execution traces |
 | `/eval` | Run prompt evaluation suites |
 | `/memory` | Show working memory |
+| `/contract` | Definition-of-Done contract: list / activate / abort |
 | `/plan` | Show current task plan |
 | `/model` | Show/switch model |
 | `/profile` | Show detected model profile + routing mode |
@@ -324,6 +341,11 @@ Returns a structured `RunResult` with: response text, tool call records, files c
 | `memory_remember` | Save knowledge to memory |
 | `web_search` | Search the web via DuckDuckGo (requires `SMALLCODE_WEB_BROWSE=true`) |
 | `web_fetch` | Fetch and extract text from a URL (requires `SMALLCODE_WEB_BROWSE=true`) |
+| `contract_create` | Declare a Definition-of-Done with a list of testable assertions |
+| `contract_status` | Show the active contract: assertions, state, blockers |
+| `contract_assert_pass` | Mark an assertion passed (with command-line evidence) |
+| `contract_assert_fail` | Mark an assertion failed (with evidence) |
+| `contract_assert_skip` | Mark an assertion skipped (out of scope) |
 
 ### Web Browsing
 

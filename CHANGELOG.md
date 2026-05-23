@@ -1,5 +1,52 @@
 # Changelog
 
+## [1.2.0] - 2026-05-23
+
+### feat: contract / definition-of-done + per-turn idempotent-write dedup + bench diff
+
+Three additions inspired by [jukefr/itsy](https://github.com/jukefr/itsy)
+(SmallCode's downstream Rust port):
+
+- **Contract / Definition-of-Done** — declarative per-project assertion list
+  the agent commits to up-front. The agent cannot deliver a final
+  "I'm done"-shaped response while any assertion is `pending` or `failed`.
+  Declared in MarrowScript at `marrow/contract.marrow` and implemented as a
+  hand-port at `src/session/contract.js` plus `contract_store.js` and
+  `contract_tools.js`. Five new tools — `contract_create`, `contract_status`,
+  `contract_assert_pass`, `contract_assert_fail`, `contract_assert_skip` —
+  plus a `/contract` slash command. State persists to
+  `.smallcode/contracts/<id>/state.json` with re-rendered `contract.md` and
+  `assertions.md` views and a `log.jsonl` audit trail. Disable with
+  `SMALLCODE_CONTRACT=false`. The done-guard heuristic lives in
+  `src/session/contract_guard.js`.
+- **Per-turn idempotent-write dedup** — closes the spam-loop gap where small
+  models could call `memory_remember` (or `memory_forget`) with identical
+  args 30+ times in a single turn. `PURE_TOOLS` dedup is sliding-window and
+  excludes writes; this set is per-turn, scoped to declared idempotent
+  writes, and resets between turns. Implemented in
+  `src/tools/dedup.js::IdempotentWriteSet` with hooks in
+  `bin/smallcode.js`'s `executeTool` wrapper and turn boundary. Disable with
+  `SMALLCODE_IDEMPOTENT_WRITE_DEDUP=false`. Inspired by itsy commit 32653f3.
+- **Benchmark diff tool + BDD skill** — new `bench/diff.js` compares two
+  harness JSON outputs and exits `0` improved / `1` regressed / `2` noise
+  with optional `--json` for CI. Skill at
+  `skills/benchmark-driven-development.md` adapted from itsy's same-named
+  skill. Wired as `npm run bench:diff <baseline> <feature>`.
+
+### Verification
+
+- 46/46 new unit tests across `test/contract.test.js`,
+  `test/dedup_idempotent.test.js`, `test/bench_diff.test.js`
+- 14/14 existing SSRF guard tests still pass (60/60 total via `npm test`)
+- 11/11 E2E checks via `npm run test:e2e` against
+  `huihui-gemma-4-e4b-it-abliterated` on `http://10.0.0.20:1234/v1`. Live
+  trace: model created the contract, marked `a01` passed, tried to claim
+  done, done-guard fired (`⚠ contract guard: 1 unresolved assertion`),
+  model recovered by calling `contract_status` then `contract_assert_skip`
+  on `a02`, contract auto-completed.
+
+---
+
 ## [1.1.0] - 2026-05-23
 
 ### feat: tool-call recovery + /version command + SSRF guard hardening

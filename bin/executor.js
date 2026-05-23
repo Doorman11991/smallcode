@@ -773,6 +773,19 @@ async function executeTool(name, args, ctx) {
       return { result: `Category: ${category}. Proceed with your tool call.`, category };
     }
 
+    case 'contract_status':
+    case 'contract_create':
+    case 'contract_assert_pass':
+    case 'contract_assert_fail':
+    case 'contract_assert_skip': {
+      try {
+        const { executeContractTool } = require('../src/session/contract_tools');
+        return await executeContractTool(name, args, { cwd });
+      } catch (e) {
+        return { error: `${name} failed: ${e.message}` };
+      }
+    }
+
     default: {
       if (mcpClient && mcpClient.isMCPTool(name)) {
         const mcpResult = await mcpClient.callTool(name, args);

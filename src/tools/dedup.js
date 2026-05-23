@@ -40,6 +40,31 @@ const PURE_TOOLS = new Set([
   'memory_list',
 ]);
 
+// Tools whose effect is *idempotent within a single turn* — calling them
+// twice in the same turn with the same args is a model spiral, not real
+// progress. We can't put them in PURE_TOOLS (they DO mutate state, just
+// idempotently), but we want to short-circuit identical repeats per turn.
+//
+// Observed in the wild: small models calling memory_remember(same key) 36
+// times in a single turn until the tool-call cap kills the run.
+//
+// Configuration:
+//   SMALLCODE_IDEMPOTENT_WRITE_DEDUP=false   disable entirely
+const IDEMPOTENT_WRITE_TOOLS = new Set([
+  'memory_remember',
+  'memory_forget',
+]);
+
+/**
+ * Compute a stable hash for (toolName, args). Same scheme used by lookup()
+ * — sorted-keys JSON so callers can re-derive the key without instantiating
+ * a ToolDedup.
+ */
+function idempotentWriteKey(name, args) {
+  const norm = JSON.stringify(args || {}, Object.keys(args || {}).sort());
+  return crypto.createHash('sha1').update(name + '|' + norm).digest('hex').slice(0, 16);
+}
+
 class ToolDedup {
   constructor(options = {}) {
     this.windowSize = options.windowSize || parseInt(process.env.SMALLCODE_DEDUP_WINDOW) || 5;
@@ -125,4 +150,80 @@ function getDedup() {
 }
 function resetDedup() { if (_instance) _instance.reset(); }
 
-module.exports = { ToolDedup, getDedup, resetDedup, PURE_TOOLS };
+// ─── Per-turn idempotent-write dedup ─────────────────────────────────────────
+//
+// PURE_TOOLS dedup is sliding-window across N recent calls. This is a separate,
+// stricter guard: identical calls to an idempotent-write tool within the same
+// turn always short-circuit. Reset between turns, not between sessions.
+
+class IdempotentWriteSet {
+  constructor(options = {}) {
+    this.disabled = options.disable || process.env.SMALLCODE_IDEMPOTENT_WRITE_DEDUP === 'false';
+    this.seen = new Set(); // hash strings
+    this.hits = 0;
+  }
+
+  isIdempotent(name) {
+    return IDEMPOTENT_WRITE_TOOLS.has(name);
+  }
+
+  // Returns true if this call was already executed *this turn*.
+  has(name, args) {
+    if (this.disabled) return false;
+    if (!this.isIdempotent(name)) return false;
+    return this.seen.has(idempotentWriteKey(name, args));
+  }
+
+  // Record a successful idempotent-write call.
+  record(name, args, result) {
+    if (this.disabled) return;
+    if (!this.isIdempotent(name)) return;
+    if (result && result.error) return; // don't lock out retries on error
+    this.seen.add(idempotentWriteKey(name, args));
+  }
+
+  // Build the canonical "skipped" result that replaces the real tool call.
+  shortCircuitResult(name) {
+    this.hits += 1;
+    return {
+      result: `[${name}: already stored this turn — skipped duplicate call]`,
+      _idempotentWriteSkipped: true,
+    };
+  }
+
+  // Call once at the start of every turn (NOT every session).
+  newTurn() {
+    this.seen.clear();
+  }
+
+  reset() {
+    this.seen.clear();
+    this.hits = 0;
+  }
+
+  stats() {
+    return { hits: this.hits, size: this.seen.size, disabled: this.disabled };
+  }
+}
+
+let _writeSetInstance = null;
+function getIdempotentWriteSet() {
+  if (!_writeSetInstance) _writeSetInstance = new IdempotentWriteSet();
+  return _writeSetInstance;
+}
+function resetIdempotentWriteSet() { if (_writeSetInstance) _writeSetInstance.reset(); }
+function newTurnIdempotentWriteSet() { if (_writeSetInstance) _writeSetInstance.newTurn(); }
+
+module.exports = {
+  ToolDedup,
+  getDedup,
+  resetDedup,
+  PURE_TOOLS,
+  // Idempotent-write set — separate per-turn dedup for memory_remember etc.
+  IdempotentWriteSet,
+  IDEMPOTENT_WRITE_TOOLS,
+  idempotentWriteKey,
+  getIdempotentWriteSet,
+  resetIdempotentWriteSet,
+  newTurnIdempotentWriteSet,
+};

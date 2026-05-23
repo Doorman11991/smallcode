@@ -407,6 +407,20 @@ async function executeTool(name, args) {
     if (cached) return ToolDedup.markCached(cached);
   } catch {}
 
+  // Per-turn idempotent-write dedup: stop spirals where the model calls
+  // memory_remember (or memory_forget) with the same args repeatedly within
+  // a single turn. PURE_TOOLS dedup doesn't cover these — they DO mutate state
+  // and can't be cached across turns — but inside a turn they're idempotent
+  // and re-calling is always wasted work.
+  let writeSet = null;
+  try {
+    const { getIdempotentWriteSet } = require('../src/tools/dedup');
+    writeSet = getIdempotentWriteSet();
+    if (writeSet.has(name, args)) {
+      return writeSet.shortCircuitResult(name);
+    }
+  } catch {}
+
   const result = await _executeToolModule(name, args, {
     _fullscreenRef,
     mcpCall,
@@ -419,6 +433,7 @@ async function executeTool(name, args) {
   });
 
   try { if (dedup) dedup.record(name, args, result); } catch {}
+  try { if (writeSet) writeSet.record(name, args, result); } catch {}
   return result;
 }
 
@@ -482,6 +497,15 @@ function estimateHistoryTokens(history) {
 async function runAgentLoop(userMessage, config) {
   // Reset early-stop state for new turn
   earlyStop.newTurn();
+
+  // Reset per-turn idempotent-write dedup. PURE_TOOLS dedup uses a sliding
+  // window across turns; this set is *per-turn* and stops `memory_remember`
+  // (and friends) from being called with identical args repeatedly in a
+  // single turn. See src/tools/dedup.js for the full rationale.
+  try {
+    const { newTurnIdempotentWriteSet } = require('../src/tools/dedup');
+    newTurnIdempotentWriteSet();
+  } catch {}
 
   // Start trace recording for this turn
   traceRecorder.start(userMessage, config.model.name);
@@ -1560,6 +1584,22 @@ Read the FULL file above carefully. Fix ALL errors. Use the patch tool with the 
 
     // Stream the final response for better UX
     if (message.content) {
+      // Contract done-guard: if a contract is active and the model claims
+      // completion while assertions are still pending/failed, inject a
+      // [CONTRACT-GUARD] system message and continue the loop instead of
+      // pushing the wrap-up text. See src/session/contract_guard.js.
+      try {
+        const { checkDoneGuard } = require('../src/session/contract_guard');
+        const guard = checkDoneGuard(message.content, process.cwd());
+        if (guard) {
+          conversationHistory.push({ role: 'assistant', content: message.content });
+          conversationHistory.push({ role: 'user', content: guard.injection });
+          if (_fullscreenRef) _fullscreenRef.addTool('contract', 'warn', `${guard.blockers.length} blockers`);
+          else console.log(`  \x1b[33m⚠ contract guard: ${guard.blockers.length} unresolved assertion${guard.blockers.length === 1 ? '' : 's'}\x1b[0m`);
+          continue;
+        }
+      } catch {}
+
       conversationHistory.push({ role: 'assistant', content: message.content });
 
       // Reviewer agent (Feature #18): async critique of the response when files
@@ -2495,8 +2535,9 @@ async function runNonInteractive(config, prompt) {
     resetFileStateTracker();
   } catch {}
   try {
-    const { resetDedup } = require('../src/tools/dedup');
+    const { resetDedup, resetIdempotentWriteSet } = require('../src/tools/dedup');
     resetDedup();
+    resetIdempotentWriteSet();
   } catch {}
   try {
     const { resetSnapshotManager } = require('../src/session/snapshot');
