@@ -938,6 +938,18 @@ async function runAgentLoop(userMessage, config) {
     const message = response.choices?.[0]?.message;
     if (!message) break;
 
+    // Defensive recovery: some local models (qwen2.5-coder, hermes, llama3
+    // GGUFs) emit tool calls as JSON inside `content` instead of populating
+    // structured `tool_calls`. Try to lift them into the proper field
+    // before any downstream logic looks at the message. Issue #36.
+    try {
+      const { extractFromMessage } = require('../src/tools/tool_call_extractor');
+      const r = extractFromMessage(message, getAllTools(config, currentToolCategory));
+      if (r.patched && _fullscreenRef) {
+        _fullscreenRef.addTool('tool_call', 'ok', `recovered ${r.addedCalls} from text content`);
+      }
+    } catch {}
+
     // Truncate excessive thinking content before it enters conversation history.
     // Reasoning models can ignore the soft budget and emit 50KB of thinking
     // loops. We hard-cap it here so the next turn doesn't include a wall of

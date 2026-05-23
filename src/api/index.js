@@ -79,6 +79,13 @@ class SmallCode extends EventEmitter {
         const message = response.choices?.[0]?.message;
         if (!message) break;
 
+        // Recover tool calls embedded in text content (qwen2.5-coder etc.)
+        // See src/tools/tool_call_extractor.js + issue #36.
+        try {
+          const { extractFromMessage } = require('../tools/tool_call_extractor');
+          extractFromMessage(message, this._getTools());
+        } catch {}
+
         // Track token usage
         if (response.usage) {
           result.tokensUsed.input += response.usage.prompt_tokens || 0;

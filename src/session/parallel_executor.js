@@ -91,6 +91,14 @@ async function executeBatch(batch, planSteps, systemMessages, chatCompletionFn, 
         const choice = response?.choices?.[0]?.message;
         if (!choice) break;
 
+        // Recover tool calls embedded in text content (qwen2.5-coder etc.).
+        // Issue #36 — the agent loop in bin/smallcode.js does the same.
+        try {
+          const { extractFromMessage } = require('../tools/tool_call_extractor');
+          const tools = (typeof ctx?.getAllTools === 'function' ? ctx.getAllTools(config) : null) || [];
+          extractFromMessage(choice, tools);
+        } catch {}
+
         finalContent = choice.content || '';
 
         const toolCalls = choice.tool_calls || [];

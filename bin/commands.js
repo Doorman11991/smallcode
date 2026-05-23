@@ -728,6 +728,24 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         return;
       }
 
+      case '/version':
+      case '/v': {
+        // Read version from package.json (single source of truth).
+        try {
+          const pkg = require('../package.json');
+          console.log('');
+          console.log(`  ${chalk.bold('SmallCode')} ${chalk.cyan('v' + pkg.version)}`);
+          if (pkg.description) console.log(`  ${chalk.gray(pkg.description)}`);
+          console.log(`  ${chalk.gray('Node ' + process.version + ' on ' + process.platform + '/' + process.arch)}`);
+          console.log('');
+        } catch (e) {
+          console.log(chalk.gray('  Version info unavailable: ' + e.message));
+          console.log('');
+        }
+        rl.prompt();
+        return;
+      }
+
       case '/help':
         console.log('');
         console.log(chalk.bold('  Commands'));
@@ -754,6 +772,7 @@ module.exports = function createCommandHandler(config, conversationHistory, impr
         console.log(`  ${chalk.cyan('/trace')}         ${chalk.gray('View/export execution traces')}`);
         console.log(`  ${chalk.cyan('/eval')} <suite>   ${chalk.gray('Run prompt evaluation')}`);
         console.log(`  ${chalk.cyan('/clear')}         ${chalk.gray('Reset entire session')}`);
+        console.log(`  ${chalk.cyan('/version')}       ${chalk.gray('Show SmallCode version')}`);
         console.log(`  ${chalk.cyan('/quit')}          ${chalk.gray('Exit SmallCode')}`);
         console.log('');
         rl.prompt();

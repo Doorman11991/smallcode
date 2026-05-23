@@ -1,5 +1,35 @@
 # Changelog
 
+## [Unreleased]
+
+### fix: /version slash command + tool-call extraction for qwen2.5-coder
+
+Two reported issues fixed.
+
+- **Issue #40 — `/version` returns "Unknown"** — `/version` (and `/v`) now
+  print the SmallCode version, package description, and Node/platform info.
+  Sourced from `package.json` so the value can never drift. Added to the
+  `/help` listing too.
+- **Issue #36 — qwen2.5-coder:14b spills tool JSON into chat** — added a
+  defensive tool-call extractor (`src/tools/tool_call_extractor.js`) that
+  recovers tool invocations the model emitted as text instead of as a
+  structured `tool_calls` field. Wired into `bin/smallcode.js`,
+  `src/api/index.js`, and `src/session/parallel_executor.js` so all three
+  entry points benefit. Recognises four shapes:
+  - `<tool_call>{...}</tool_call>` (Hermes / qwen native template)
+  - `` ```json ... ``` `` and `` ```tool_call ... ``` `` fences
+  - Bare leading JSON object/array
+  - `{ "function": { "name", "arguments" } }` and `{ "tool", "args" }` forms
+  - Tolerates trailing commas, which qwen sometimes emits.
+
+  Conservative by design — calls referencing unknown tool names are left in
+  the chat content rather than executed.
+
+  Coverage: `.test-workspace/tool_call_extractor_test.js` (10 cases) and
+  `.test-workspace/version_command_test.js` (3 cases).
+
+---
+
 ## [1.0.2] - 2026-05-22
 
 ### fix: empty tools array + ~/.smallcode/skills/ support

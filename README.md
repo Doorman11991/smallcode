@@ -260,6 +260,7 @@ npm run bench:tools
 | `/skill` | Manage reusable skills |
 | `/plugin` | Install/manage plugins |
 | `/sessions` | List/resume saved sessions |
+| `/version`, `/v` | Show SmallCode version + Node/platform |
 | `/help` | Show all commands |
 
 ## Observability
