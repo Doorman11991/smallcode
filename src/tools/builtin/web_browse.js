@@ -153,8 +153,22 @@ async function webFetch(url, maxChars = 5000) {
 async function _fetchWithBrowser(browser, url, maxChars) {
   const page = await browser.newPage();
   try {
+    // Re-validate every URL the page touches (initial request, redirects,
+    // and any subresource the document fetches). page.goto follows HTTP
+    // redirects with no per-hop control, so an LLM-supplied URL that 302s
+    // to 169.254.169.254 would otherwise bypass the guard — matching the
+    // exact "don't auto-follow" reasoning _fetchSimple already documents
+    // a few lines down.
+    await page.route('**/*', async (route) => {
+      try {
+        _assertUrlSafe(route.request().url());
+        await route.continue();
+      } catch {
+        await route.abort();
+      }
+    });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    
+
     // Extract readable text (strip nav, ads, etc.)
     const text = await page.evaluate(() => {
       // Remove noise elements

@@ -17,78 +17,126 @@
 //     services (169.254.169.254) even when LLM_ALLOW_PUBLIC_ENDPOINTS=1
 //     is set, unless the URL was an explicit allowlist match. This blocks
 //     classic SSRF-to-cloud-metadata attacks.
+//   - We canonicalize IPv6 aliases of IPv4 addresses (`::ffff:a.b.c.d`,
+//     `::ffff:wwww:xxxx`, `::a.b.c.d`) before checking. Node's URL parser
+//     normalizes `http://[::ffff:169.254.169.254]/` to hostname
+//     `[::ffff:a9fe:a9fe]`, which a naive dotted-quad regex misses but the
+//     OS routes straight to the underlying IPv4 metadata IP.
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.assertEndpointAllowed = assertEndpointAllowed;
-
+// Return every representation of `host` that the OS might route to:
+//   - the input lowered
+//   - the input with surrounding [] stripped (URL.hostname keeps them for IPv6)
+//   - if it's an IPv4-mapped or IPv4-compatible IPv6, the embedded dotted-quad
+//
+// Checking every variant defeats the classic alias bypass where a hostname
+// like `[::ffff:169.254.169.254]` slips a dotted-quad regex but resolves
+// directly to 169.254.169.254 at connect time.
+function hostVariants(host) {
+    const out = new Set();
+    const lower = host.toLowerCase();
+    out.add(lower);
+    let h = lower;
+    if (h.startsWith("[") && h.endsWith("]")) {
+        h = h.slice(1, -1);
+        out.add(h);
+    }
+    const dotted = h.match(/^(?:::ffff:|::)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (dotted)
+        out.add(dotted[1]);
+    const hex = h.match(/^(?:::ffff:|::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hex) {
+        const a = parseInt(hex[1], 16), b = parseInt(hex[2], 16);
+        out.add(`${(a >> 8) & 0xff}.${a & 0xff}.${(b >> 8) & 0xff}.${b & 0xff}`);
+    }
+    return [...out];
+}
+function isLoopbackOne(h) {
+    if (h === "localhost" || h === "::1" || h === "::")
+        return true;
+    if (h.startsWith("127."))
+        return true;
+    return false;
+}
 function isLoopback(host) {
-    const h = host.toLowerCase();
-    if (h === "localhost" || h === "::1" || h === "::") return true;
-    if (h.startsWith("127.")) return true;
-    return false;
+    return hostVariants(host).some(isLoopbackOne);
 }
-
-function isRfc1918(host) {
-    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-    if (!m) return false;
+function isRfc1918One(h) {
+    const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m)
+        return false;
     const a = Number(m[1]), b = Number(m[2]);
-    if (a === 10) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
+    if (a === 10)
+        return true;
+    if (a === 172 && b >= 16 && b <= 31)
+        return true;
+    if (a === 192 && b === 168)
+        return true;
     return false;
 }
-
-// Cloud metadata + link-local + CGNAT — never allowed implicitly.
-function isAlwaysBlocked(host) {
-    const h = host.toLowerCase();
-    if (h === "169.254.169.254") return true; // AWS/GCP/Azure metadata IPv4
-    if (h === "fd00:ec2::254" || h === "[fd00:ec2::254]") return true; // AWS IPv6 metadata
-    if (h === "metadata.google.internal") return true;
-    if (h === "metadata") return true;
+function isRfc1918(host) {
+    return hostVariants(host).some(isRfc1918One);
+}
+function isAlwaysBlockedOne(h) {
+    if (h === "169.254.169.254")
+        return true;
+    if (h === "fd00:ec2::254" || h === "[fd00:ec2::254]")
+        return true;
+    if (h === "metadata.google.internal")
+        return true;
+    if (h === "metadata")
+        return true;
     const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
     if (m) {
         const a = Number(m[1]), b = Number(m[2]);
-        if (a === 169 && b === 254) return true; // 169.254/16 link-local
-        if (a === 100 && b >= 64 && b <= 127) return true; // 100.64/10 CGNAT
-        if (a === 0) return true; // 0.0.0.0/8 reserved
+        if (a === 169 && b === 254)
+            return true;
+        if (a === 100 && b >= 64 && b <= 127)
+            return true;
+        if (a === 0)
+            return true;
     }
     return false;
 }
-
+function isAlwaysBlocked(host) {
+    return hostVariants(host).some(isAlwaysBlockedOne);
+}
 function originOf(url) {
-    // URL.origin returns "scheme://host[:port]" — exactly what we want
-    // for prefix matching without falling for path-suffix tricks.
     return url.origin.replace(/\/+$/, "");
 }
-
 function originMatches(allowEntry, url) {
     let allowUrl;
-    try { allowUrl = new URL(allowEntry); } catch { return false; }
+    try {
+        allowUrl = new URL(allowEntry);
+    }
+    catch {
+        return false;
+    }
     return originOf(allowUrl) === originOf(url);
 }
-
 function assertEndpointAllowed(endpoint) {
     let url;
     try {
         url = new URL(endpoint);
-    } catch {
+    }
+    catch {
         throw new Error(`Invalid endpoint URL: ${endpoint}`);
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") {
         throw new Error(`Endpoint must use http(s): ${endpoint}`);
     }
-    // Always block cloud metadata + link-local + CGNAT, even when the
-    // operator explicitly opted into public endpoints. These are never
-    // intentionally targeted by an LLM provider.
     if (isAlwaysBlocked(url.hostname)) {
         throw new Error(`Endpoint ${endpoint} targets a metadata/link-local address; refusing.`);
     }
-    if (process.env.LLM_ALLOW_PUBLIC_ENDPOINTS === "1") return;
-
+    if (process.env.LLM_ALLOW_PUBLIC_ENDPOINTS === "1")
+        return;
     const allow = (process.env.LLM_ENDPOINT_ALLOWLIST || "").split(",").map(s => s.trim()).filter(Boolean);
     for (const a of allow) {
-        if (originMatches(a, url)) return;
+        if (originMatches(a, url))
+            return;
     }
-    if (isLoopback(url.hostname) || isRfc1918(url.hostname)) return;
+    if (isLoopback(url.hostname) || isRfc1918(url.hostname))
+        return;
     throw new Error(`Endpoint ${endpoint} is not in LLM_ENDPOINT_ALLOWLIST and is not a private host. ` +
         `Set LLM_ENDPOINT_ALLOWLIST=<comma-separated origins> or LLM_ALLOW_PUBLIC_ENDPOINTS=1 to permit.`);
 }
