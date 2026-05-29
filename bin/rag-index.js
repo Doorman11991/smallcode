@@ -6,6 +6,18 @@ const path = require('path');
 const { RagIndexStore } = require('../src/rag/index_store');
 const { ensureRepo, collectSnippets } = require('../src/rag/github_scraper');
 
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`Usage: smallcode-rag-index
+
+Reads .smallcode/rag/repos.json (or SMALLCODE_RAG_REPOS) and writes .smallcode/rag/index.json.
+
+Example repos.json:
+{
+  "repos": ["https://github.com/owner/repo.git"]
+}`);
+  process.exit(0);
+}
+
 function loadConfig() {
   const cfgPath = process.env.SMALLCODE_RAG_REPOS || path.join(process.cwd(), '.smallcode', 'rag', 'repos.json');
   if (!fs.existsSync(cfgPath)) {

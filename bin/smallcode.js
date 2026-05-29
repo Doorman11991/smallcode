@@ -245,6 +245,7 @@ let _planTracker = null;
 let _bootstrapDetector = null;
 let _testRunnerDetector = null;
 let _knowledgeLoader = null;
+let _ragRetriever = null;
 const improvementAttempts = {}; // filePath → attempt count
 
 async function runTUI(config) {
@@ -684,6 +685,12 @@ async function runAgentLoop(userMessage, config) {
     const { KnowledgeLoader } = require('../src/knowledge/loader');
     _knowledgeLoader = new KnowledgeLoader({ rootDir: process.cwd() });
   } catch { _knowledgeLoader = null; }
+  // RAG retriever: local code examples indexed from GitHub repos or other source trees.
+  try {
+    const { RagRetriever } = require('../src/rag/retriever');
+    _ragRetriever = new RagRetriever();
+    _ragRetriever.load();
+  } catch { _ragRetriever = null; }
   // Trust decay (Feature 13) resets per agent loop turn so TUI sessions
   // don't accumulate decay from unrelated prior requests.
   try {
@@ -1942,7 +1949,7 @@ CRITICAL — large file rule: write_file calls are limited to 60 lines / ~8KB. l
   }
 
   // Legacy behavior: everything in the system prompt
-  prompt += getMemoryContext(messages) + getSkillContext(messages) + getPluginPrompts() + getKnowledgeContext(messages) + getActivePlanContext() + getTestRunnerContext();
+  prompt += getMemoryContext(messages) + getSkillContext(messages) + getPluginPrompts() + getKnowledgeContext(messages) + getRagContext(messages) + getActivePlanContext() + getTestRunnerContext();
 
   return prompt;
 }
@@ -1957,6 +1964,7 @@ function buildDynamicContext(messages) {
     getMemoryContext(messages),
     getSkillContext(messages),
     getKnowledgeContext(messages),
+    getRagContext(messages),
     // Note: getPluginPrompts() stays in the system prompt — plugin instructions
     //   are authoritative and should come from the system role.
     // Note: getActivePlanContext() stays in the system prompt — the model needs
@@ -2001,6 +2009,20 @@ function getKnowledgeContext(messages) {
     if (!loader) return '';
     const maxTokens = Math.min(1500, Math.floor(((config?.context?.detected_window || 32768) * 0.04)));
     return loader.formatForPrompt(lastUser.content, { maxTokens });
+  } catch {
+    return '';
+  }
+}
+
+// Auto-load similar code snippets from the local RAG index. The index is
+// created with `npm run rag:index` / `smallcode-rag-index` and stays fully local.
+function getRagContext(messages) {
+  try {
+    if (!_ragRetriever) return '';
+    const lastUser = [...messages].reverse().find(m => m.role === 'user');
+    if (!lastUser || typeof lastUser.content !== 'string') return '';
+    const maxChars = Math.min(6000, Math.floor(((config?.context?.detected_window || 32768) * 0.06) * 4));
+    return _ragRetriever.formatForPrompt(lastUser.content, { limit: 6, maxChars });
   } catch {
     return '';
   }

@@ -7,15 +7,15 @@ const cp = require('child_process');
 
 const CODE_EXTS = new Set(['.js', '.ts', '.tsx', '.jsx', '.py', '.go', '.rs', '.java', '.cpp', '.c', '.cs', '.php', '.rb']);
 
-function run(cmd, cwd) {
-  cp.execSync(cmd, { cwd, stdio: 'pipe' });
+function runGit(args, cwd) {
+  cp.execFileSync('git', args, { cwd, stdio: 'pipe' });
 }
 
 function ensureRepo(url, targetDir) {
   const name = url.replace(/\.git$/, '').split('/').slice(-2).join('__');
   const out = path.join(targetDir, name);
-  if (fs.existsSync(path.join(out, '.git'))) run('git pull --ff-only', out);
-  else run(`git clone --depth=1 ${url} ${out}`);
+  if (fs.existsSync(path.join(out, '.git'))) runGit(['pull', '--ff-only'], out);
+  else runGit(['clone', '--depth=1', url, out], targetDir);
   return out;
 }
 

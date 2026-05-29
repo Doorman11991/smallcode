@@ -17,11 +17,22 @@ class RagRetriever {
   constructor(options = {}) {
     this.index = options.index || new RagIndexStore(options.store || {});
     this.maxLoops = options.maxLoops || 3;
+    this.loaded = false;
   }
 
-  load() { return this.index.load(); }
+  load() {
+    const count = this.index.load();
+    this.loaded = true;
+    return count;
+  }
+
+  ensureLoaded() {
+    if (!this.loaded) return this.load();
+    return this.index.docs.length;
+  }
 
   retrieve(query, opts = {}) {
+    this.ensureLoaded();
     const plan = planQuery(query);
     const loops = [];
     let hits = [];
@@ -38,6 +49,31 @@ class RagRetriever {
       stuck: (hits[0]?.score || 0) < 0.2,
       googleFallback: (hits[0]?.score || 0) < 0.2 ? googleFallbackUrl(query) : null,
     };
+  }
+
+  formatForPrompt(query, opts = {}) {
+    if (process.env.SMALLCODE_RAG_DISABLE === 'true') return '';
+    const result = this.retrieve(query, opts);
+    if (!result.hits.length) return '';
+
+    const maxChars = opts.maxChars || 6000;
+    let used = 0;
+    const parts = [];
+    for (const hit of result.hits.slice(0, opts.limit || 6)) {
+      const code = String(hit.code || '').slice(0, opts.snippetChars || 1200);
+      const lang = String(hit.lang || '').replace(/[^a-z0-9+#-]/gi, '');
+      const header = `### ${hit.repo || 'local'}:${hit.path}:${hit.startLine || 1} score=${hit.score.toFixed(3)}`;
+      const block = `${header}\n` + '```' + `${lang}\n${code}\n` + '```';
+      if (used + block.length > maxChars) break;
+      used += block.length;
+      parts.push(block);
+    }
+    if (!parts.length) return '';
+
+    const stuckHint = result.stuck && process.env.SMALLCODE_WEB_BROWSE === 'true'
+      ? `\nRAG confidence is low. If blocked, use web_search with: ${query} github code example`
+      : '';
+    return `\n[RAG_CODE_CONTEXT] Retrieved similar code snippets. Use these as examples, not as authoritative project files.${stuckHint}\n${parts.join('\n\n')}\n[/RAG_CODE_CONTEXT]\n`;
   }
 }
 
