@@ -50,6 +50,26 @@ The install script downloads the correct tarball for your platform, extracts it 
 
 SmallCode includes [BoneScript](https://github.com/Doorman11991/BoneScript) and [budget-aware-mcp](https://github.com/Doorman11991/budget-aware-mcp) as dependencies — everything installs in one go.
 
+### RAG harness quick run
+
+SmallCode runs as a terminal UI harness by default:
+
+```bash
+smallcode                 # fullscreen TUI
+smallcode --classic       # readline UI fallback
+node bin/smallcode.js     # from a repo checkout
+```
+
+To build the local GitHub RAG database, create `.smallcode/rag/repos.json` with a `repos` array, then run:
+
+```bash
+npm run rag:index
+# or, after install:
+smallcode-rag-index
+```
+
+See [docs/rag-harness.md](docs/rag-harness.md) for the full LM Studio/llama.cpp setup, UI walkthrough, RAG config, indexing, and web-fallback flow.
+
 ### Requirements
 
 - Node.js 18+ (LTS recommended — 20.x or 22.x have prebuilt binaries for SQLite)
