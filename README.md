@@ -50,9 +50,59 @@ The install script downloads the correct tarball for your platform, extracts it 
 
 SmallCode includes [BoneScript](https://github.com/Doorman11991/BoneScript) and [budget-aware-mcp](https://github.com/Doorman11991/budget-aware-mcp) as dependencies — everything installs in one go.
 
+### Fresh GitHub checkout quick start
+
+If you just cloned/pulled this repository, run it directly from the checkout first:
+
+```bash
+cd smallcode
+npm install
+
+# Start your local model server first (LM Studio, llama.cpp, Ollama, etc.)
+cat > .env <<'EOF'
+SMALLCODE_MODEL=your-local-model-name
+SMALLCODE_BASE_URL=http://localhost:1234/v1
+EOF
+
+node bin/smallcode.js
+```
+
+Optional: make the `smallcode` and `smallcode-rag-index` commands available globally from this checkout:
+
+```bash
+npm link
+smallcode --help
+```
+
+If the fullscreen UI has display issues in your terminal, start with `node bin/smallcode.js --classic`.
+
+### RAG harness quick run
+
+SmallCode runs as a terminal UI harness by default:
+
+```bash
+smallcode                 # fullscreen TUI
+smallcode --classic       # readline UI fallback
+node bin/smallcode.js     # from a repo checkout
+```
+
+To build the local GitHub RAG database, run the Python scraper/indexer with the curated starter corpus, or use the broader preset for a larger multi-language corpus:
+
+```bash
+npm run rag:index
+npm run rag:index -- --preset broad
+# or, after install:
+smallcode-rag-index --preset broad
+```
+
+For custom repos, create `.smallcode/rag/repos.json` with `preset`, `repos`, and chunking limits.
+
+See [docs/rag-harness.md](docs/rag-harness.md) for the full LM Studio/llama.cpp setup, UI walkthrough, RAG config, indexing, and web-fallback flow.
+
 ### Requirements
 
 - Node.js 18+ (LTS recommended — 20.x or 22.x have prebuilt binaries for SQLite)
+- Python 3 + Git for the RAG scraper/indexer (`npm run rag:index`)
 - A local LLM server (LM Studio, Ollama, or any OpenAI-compatible endpoint)
 
 **Optional** (for code graph + FTS5 memory search):

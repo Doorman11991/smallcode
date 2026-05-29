@@ -5,7 +5,8 @@
   "main": "src/api/index.js",
   "bin": {
     "smallcode": "bin/smallcode.js",
-    "smallcode-init": "bin/init.js"
+    "smallcode-init": "bin/init.js",
+    "smallcode-rag-index": "bin/rag-index.js"
   },
   "scripts": {
     "build": "node build.js",
@@ -21,7 +22,8 @@
     "bench:diff": "node bench/diff.js",
     "test": "node --test test/*.test.js",
     "test:e2e": "node test/e2e_smoke.js",
-    "test:e2e:offline": "node test/e2e_offline.js"
+    "test:e2e:offline": "node test/e2e_offline.js",
+    "rag:index": "node bin/rag-index.js"
   },
   "dependencies": {
     "bonescript-compiler": "0.14.0",
@@ -39,8 +41,12 @@
     "puppeteer-extra-plugin-stealth": "^2.11.0"
   },
   "peerDependenciesMeta": {
-    "playwright-extra": { "optional": true },
-    "puppeteer-extra-plugin-stealth": { "optional": true }
+    "playwright-extra": {
+      "optional": true
+    },
+    "puppeteer-extra-plugin-stealth": {
+      "optional": true
+    }
   },
   "keywords": [
     "ai",
