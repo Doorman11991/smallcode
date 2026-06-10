@@ -28,8 +28,8 @@ const TOOL_CATEGORIES = {
     tools: ['bash', 'run'],
   },
   plan: {
-    description: 'Load/save project memory, BoneScript compile/check',
-    tools: ['memory_load', 'memory_remember', 'bone_compile', 'bone_check'],
+    description: 'Load/save project memory, BoneScript compile/check, verify boolean logic',
+    tools: ['memory_load', 'memory_remember', 'bone_compile', 'bone_check', 'verify_logic'],
   },
 };
 

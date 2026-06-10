@@ -457,6 +457,7 @@ Returns a structured `RunResult` with: response text, tool call records, files c
 | `find_files` | Glob file search |
 | `memory_load` | Load relevant project memory |
 | `memory_remember` | Save knowledge to memory |
+| `verify_logic` | Verify boolean expressions for contradictions/tautologies — deterministic check for generated conditionals (requires `pip install boolean-algebra-engine`) |
 | `web_search` | Search the web via DuckDuckGo (requires `SMALLCODE_WEB_BROWSE=true`) |
 | `web_fetch` | Fetch and extract text from a URL (requires `SMALLCODE_WEB_BROWSE=true`) |
 | `contract_create` | Declare a Definition-of-Done with a list of testable assertions |
